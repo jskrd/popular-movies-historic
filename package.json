@@ -1,15 +1,19 @@
 {
-  "name": "popular-movies-historic",
-  "type": "module",
-  "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
-  },
-  "dependencies": {
-    "hono": "^4.9.2"
-  },
-  "devDependencies": {
-    "wrangler": "^4.4.0"
-  }
+	"name": "popular-movies-historic",
+	"type": "module",
+	"scripts": {
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+		"check": "biome lint --write .",
+		"deploy": "wrangler deploy --minify",
+		"dev": "wrangler dev",
+		"format": "biome format --write .",
+		"lint": "biome check --write ."
+	},
+	"dependencies": {
+		"hono": "^4.9.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.2.2",
+		"wrangler": "^4.4.0"
+	}
 }
