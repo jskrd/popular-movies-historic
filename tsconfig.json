@@ -1,6 +1,9 @@
 {
 	"extends": ["@tsconfig/strictest/tsconfig", "@tsconfig/node22/tsconfig"],
 	"compilerOptions": {
-		"baseUrl": "src"
+		"paths": {
+			"src/*": ["./src/*"]
+		},
+		"types": ["@cloudflare/workers-types"]
 	}
 }

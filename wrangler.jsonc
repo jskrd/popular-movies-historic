@@ -2,5 +2,14 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "popular-movies-historic",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-08-26"
+	"compatibility_date": "2025-08-26",
+	"triggers": {
+		"crons": ["0 0 * * *"]
+	},
+	"r2_buckets": [
+		{
+			"binding": "MOVIES_BUCKET",
+			"bucket_name": "popular-movies-historic-bucket"
+		}
+	]
 }
