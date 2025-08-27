@@ -1,21 +1,8 @@
-```txt
-npm install
-npm run dev
-```
+# Popular Movies Historic
 
-```txt
-npm run deploy
-```
+## About
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
+Popular Movies Historic is an archive of popular movies from December 2019 to today. This service collects and stores daily snapshots from [Steven Lu's
+Popular Movies project](https://github.com/sjlu/popular-movies), creating a single place to access popular movies over time.
 
-```txt
-npm run cf-typegen
-```
-
-Pass the `CloudflareBindings` as generics when instantiation `Hono`:
-
-```ts
-// src/index.ts
-const app = new Hono<{ Bindings: CloudflareBindings }>()
-```
+The service is built for integration with [Radarr](https://radarr.video/).
