@@ -3,6 +3,11 @@
 	"name": "popular-movies-historic",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-08-26",
+	"observability": {
+		"logs": {
+			"enabled": true
+		}
+	},
 	"triggers": {
 		"crons": ["*/1 * * * *"]
 	},
