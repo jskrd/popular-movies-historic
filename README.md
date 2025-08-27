@@ -13,6 +13,6 @@ The service is built for integration with [Radarr](https://radarr.video/).
 - 🪣 **Cloudflare R2** - Object storage for movie data
 - 🔷 **TypeScript** - Type-safe JavaScript
 - ✅ **Zod** - Schema validation and parsing
-- 🧪 **Vitest** - Fast unit testing framework
+- 🧪 **Vitest** - Unit testing framework
 - 🧹 **Biome** - Code formatting and linting
-- 📦 **pnpm** - Fast, disk space efficient package manager
+- 📦 **pnpm** - Disk space efficient package manager
