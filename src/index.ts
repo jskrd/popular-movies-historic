@@ -10,7 +10,9 @@ export default {
 		if (url.pathname !== "/") {
 			return new Response("Not Found", { status: 404 });
 		}
+
 		const movies = await getMovies(env.MOVIES_BUCKET);
+
 		return new Response(JSON.stringify(movies), {
 			headers: { "Content-Type": "application/json" },
 		});

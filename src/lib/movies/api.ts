@@ -10,16 +10,21 @@ export async function syncMovies(bucket: R2Bucket): Promise<void> {
 	if (dates.length === 0) {
 		return;
 	}
+
 	let movies = await getMovies(bucket);
+
 	for (const date of dates) {
 		const newMovies = await fetchMovies(date);
 		if (newMovies === null) {
 			continue;
 		}
+
 		const previousCount = movies.length;
+
 		for (const newMovie of newMovies) {
 			movies = appendUnique(movies, newMovie);
 		}
+
 		if (movies.length > previousCount) {
 			await setMovies(bucket, movies);
 		}
@@ -34,6 +39,7 @@ export async function getMovies(bucket: R2Bucket): Promise<Movie[]> {
 		await setMovies(bucket, movies);
 		return movies;
 	}
+
 	const data = await object.json();
 	return z.array(Movie).parse(data);
 }
@@ -50,6 +56,7 @@ async function getLastSynced(bucket: R2Bucket): Promise<Date> {
 		await setLastSynced(bucket, date);
 		return date;
 	}
+
 	const data = await object.text();
 	const parsed = z.iso.date().parse(data);
 	return new Date(parsed);
@@ -60,25 +67,30 @@ async function setLastSynced(bucket: R2Bucket, date: Date): Promise<void> {
 	if (!dateString) {
 		throw new Error("Invalid date string");
 	}
+
 	await bucket.put(lastSyncedBucketKey, dateString);
 }
 
 async function fetchMovies(date: Date): Promise<Movie[] | null> {
 	const url = getUrl(date);
+
 	const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
 	console.log(`Fetched ${url} (${response.status})`);
 	if (!response.ok) {
 		return null;
 	}
+
 	const data = await response.json();
 	return z.array(Movie).parse(data);
 }
 
 function getUrl(date: Date): string {
 	const baseUrl = "https://popular-movies-data.stevenlu.com";
+
 	const year = date.getFullYear();
 	const month = String(date.getMonth() + 1).padStart(2, "0");
 	const day = String(date.getDate()).padStart(2, "0");
+
 	return `${baseUrl}/movies-${year}${month}${day}.json`;
 }
 
@@ -107,11 +119,13 @@ function getSyncUntil(lastSynced: Date): Date {
 	if (lastSynced > latestSync) {
 		throw new Error("Invalid last sync date");
 	}
+
 	const syncUntil = new Date(lastSynced);
 	syncUntil.setDate(syncUntil.getDate() + 7); // +7 days
 	if (syncUntil > latestSync) {
 		return latestSync;
 	}
+
 	return syncUntil;
 }
 
@@ -131,6 +145,7 @@ async function getNextSyncDates(bucket: R2Bucket): Promise<Date[]> {
 	if (lastSynced === syncUntil) {
 		return [];
 	}
+
 	const syncFrom = new Date(lastSynced);
 	syncFrom.setDate(syncFrom.getDate() + 1); // +1 day
 	return getDateRange(syncFrom, syncUntil);
