@@ -4,12 +4,12 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2025-08-26",
 	"triggers": {
-		"crons": ["*/1 * * * *"],
+		"crons": ["*/1 * * * *"]
 	},
 	"r2_buckets": [
 		{
 			"binding": "MOVIES_BUCKET",
-			"bucket_name": "popular-movies-historic-bucket",
-		},
-	],
+			"bucket_name": "popular-movies-historic-bucket"
+		}
+	]
 }
