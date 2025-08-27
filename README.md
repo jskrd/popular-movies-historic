@@ -1,5 +1,7 @@
 # Popular Movies Historic
 
+[![CI](https://github.com/jskrd/popular-movies-historic/actions/workflows/ci.yml/badge.svg)](https://github.com/jskrd/popular-movies-historic/actions/workflows/ci.yml)
+
 ## About
 
 Popular Movies Historic is an archive of popular movies from December 2019 to today. This service collects and stores daily snapshots from [Steven Lu's
