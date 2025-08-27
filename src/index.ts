@@ -1,10 +1,4 @@
-import {
-	appendUnique,
-	fetchAllHistoric,
-	fetchLatest,
-} from "src/lib/movies/api.js";
-import { Movie } from "src/lib/movies/types.js";
-import z from "zod";
+import { getMovies, syncMovies } from "src/lib/movies/api.js";
 
 type Env = {
 	MOVIES_BUCKET: R2Bucket;
@@ -16,35 +10,12 @@ export default {
 		if (url.pathname !== "/") {
 			return new Response("Not Found", { status: 404 });
 		}
-
-		const file = await env.MOVIES_BUCKET.get("movies.json");
-		if (!file) {
-			const movies = await fetchAllHistoric();
-			await env.MOVIES_BUCKET.put("movies.json", JSON.stringify(movies));
-			return new Response(JSON.stringify(movies), {
-				headers: { "Content-Type": "application/json" },
-			});
-		}
-
-		return new Response(await file.text(), {
+		const movies = await getMovies(env.MOVIES_BUCKET);
+		return new Response(JSON.stringify(movies), {
 			headers: { "Content-Type": "application/json" },
 		});
 	},
-	scheduled: async (env: Env) => {
-		const existingFile = await env.MOVIES_BUCKET.get("movies.json");
-		if (!existingFile) {
-			throw new Error("File not found");
-		}
-
-		const existingData = await existingFile.json();
-		const existingMovies = z.array(Movie).parse(existingData);
-
-		const latestMovies = await fetchLatest();
-		let updatedMovies = existingMovies;
-		for (const movie of latestMovies) {
-			updatedMovies = appendUnique(updatedMovies, movie);
-		}
-
-		await env.MOVIES_BUCKET.put("movies.json", JSON.stringify(updatedMovies));
+	scheduled: async (_event: ScheduledEvent, env: Env) => {
+		await syncMovies(env.MOVIES_BUCKET);
 	},
 };
