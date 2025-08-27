@@ -1,5 +1,5 @@
 import { Movie } from "src/lib/movies/types.js";
-import z from "zod";
+import * as z from "zod";
 
 const moviesBucketKey = "movies.json";
 
