@@ -291,6 +291,51 @@ describe("syncMovies", () => {
 		vi.useRealTimers();
 	});
 
+	test("invalid JSON body: treats as non-OK (no update to last_synced)", async () => {
+		vi.useFakeTimers();
+		const now = new Date("2025-01-10T12:00:00.000Z");
+		vi.setSystemTime(now);
+
+		const bucket = new MockR2Bucket();
+
+		// Only one pending date (yesterday)
+		const lastSynced = new Date(now);
+		lastSynced.setDate(lastSynced.getDate() - 2);
+		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
+
+		await bucket.put("movies.json", "[]");
+
+		// Return 200 OK with invalid JSON body so Response.json() throws
+		vi.spyOn(globalThis, "fetch").mockImplementation((async (
+			input: RequestInfo,
+			_init?: RequestInit,
+		) => {
+			const url =
+				typeof input === "string"
+					? input
+					: input instanceof URL
+						? input.toString()
+						: (input as Request).url;
+			const re = /movies-(\d{4})(\d{2})(\d{2})\.json$/;
+			const m = url.match(re);
+			if (!m) throw new Error(`Unexpected URL: ${url}`);
+			// Invalid JSON payload
+			return new Response("not-json", { status: 200 });
+		}) as typeof fetch);
+
+		await syncMovies(bucket as unknown as R2Bucket);
+
+		const last = await bucket.get("last_synced.txt");
+		expect(await (last as MockR2Object).text()).toBe(
+			lastSynced.toISOString().slice(0, 10),
+		);
+
+		const moviesObj = await bucket.get("movies.json");
+		expect(await (moviesObj as MockR2Object).text()).toBe("[]");
+
+		vi.useRealTimers();
+	});
+
 	test("successful fetch append: writes only when movie count increases", async () => {
 		vi.useFakeTimers();
 		const now = new Date("2025-01-10T12:00:00.000Z");

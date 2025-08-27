@@ -80,7 +80,12 @@ async function fetchMovies(date: Date): Promise<Movie[] | null> {
 		return null;
 	}
 
-	const data = await response.json();
+	let data: unknown;
+	try {
+		data = await response.json();
+	} catch {
+		return null;
+	}
 	return z.array(Movie).parse(data);
 }
 
