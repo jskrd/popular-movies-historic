@@ -77,6 +77,10 @@ async function fetchMovies(date: Date): Promise<Movie[] | null> {
 	const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
 	console.log(`Fetched ${url} (${response.status})`);
 	if (!response.ok) {
+		if (response.status === 404) {
+			return [];
+		}
+
 		return null;
 	}
 
@@ -86,6 +90,7 @@ async function fetchMovies(date: Date): Promise<Movie[] | null> {
 	} catch {
 		return [];
 	}
+
 	return z.array(Movie).parse(data);
 }
 
