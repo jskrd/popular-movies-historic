@@ -291,7 +291,7 @@ describe("syncMovies", () => {
 		vi.useRealTimers();
 	});
 
-	test("invalid JSON body: treats as non-OK (no update to last_synced)", async () => {
+	test("invalid JSON body: advances last_synced and does not write movies", async () => {
 		vi.useFakeTimers();
 		const now = new Date("2025-01-10T12:00:00.000Z");
 		vi.setSystemTime(now);
@@ -323,15 +323,27 @@ describe("syncMovies", () => {
 			return new Response("not-json", { status: 200 });
 		}) as typeof fetch);
 
+		// Spy after seeding, to capture writes during sync
+		const putSpy = vi.spyOn(bucket, "put");
+
 		await syncMovies(bucket as unknown as R2Bucket);
 
 		const last = await bucket.get("last_synced.txt");
-		expect(await (last as MockR2Object).text()).toBe(
-			lastSynced.toISOString().slice(0, 10),
-		);
+		const expectedYesterday = (() => {
+			const d = new Date(now);
+			d.setDate(d.getDate() - 1);
+			return d.toISOString().slice(0, 10);
+		})();
+		expect(await (last as MockR2Object).text()).toBe(expectedYesterday);
 
 		const moviesObj = await bucket.get("movies.json");
 		expect(await (moviesObj as MockR2Object).text()).toBe("[]");
+
+		// No movies.json write because no new movies were added
+		const moviePuts = putSpy.mock.calls.filter(
+			([k]) => k === "movies.json",
+		).length;
+		expect(moviePuts).toBe(0);
 
 		vi.useRealTimers();
 	});
