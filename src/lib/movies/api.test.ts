@@ -173,19 +173,19 @@ describe("syncMovies", () => {
 		}) as typeof fetch);
 		await syncMovies(bucket as unknown as R2Bucket);
 
-		// Range: 2019-12-02 .. 2019-12-08 (7 days)
+		// Range: 2019-12-02 .. 2019-12-15 (14 days)
 		const lastSyncedObj = await bucket.get("last_synced.txt");
 		expect(lastSyncedObj).not.toBeNull();
-		expect(await (lastSyncedObj as MockR2Object).text()).toBe("2019-12-08");
+		expect(await (lastSyncedObj as MockR2Object).text()).toBe("2019-12-15");
 		const moviesObj = await bucket.get("movies.json");
 		expect(moviesObj).not.toBeNull();
 		expect(JSON.parse(await (moviesObj as MockR2Object).text())).toHaveLength(
-			7,
+			14,
 		);
 		vi.useRealTimers();
 	});
 
-	test("date window: fetches up to 7 days or yesterday, whichever earlier", async () => {
+	test("date window: fetches up to 14 days or yesterday, whichever earlier", async () => {
 		vi.useFakeTimers();
 		const now = new Date("2025-01-10T12:00:00.000Z");
 		vi.setSystemTime(now);

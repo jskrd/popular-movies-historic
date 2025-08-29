@@ -126,7 +126,7 @@ function getSyncUntil(lastSynced: Date): Date {
 	}
 
 	const syncUntil = new Date(lastSynced);
-	syncUntil.setDate(syncUntil.getDate() + 7); // +7 days
+	syncUntil.setDate(syncUntil.getDate() + 14); // +14 days
 	if (syncUntil > latestSync) {
 		return latestSync;
 	}
