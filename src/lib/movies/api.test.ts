@@ -259,7 +259,7 @@ describe("syncMovies", () => {
 		vi.useRealTimers();
 	});
 
-	test("404 day: skips adds but still advances last_synced for that date", async () => {
+	test("per-day non-OK fetch: skips adds and does not advance last_synced for that date", async () => {
 		vi.useFakeTimers();
 		const now = new Date("2025-01-10T12:00:00.000Z");
 		vi.setSystemTime(now);
@@ -284,13 +284,10 @@ describe("syncMovies", () => {
 
 		expect(await (moviesObj as MockR2Object).text()).toBe("[]");
 		const last = await bucket.get("last_synced.txt");
-		// 404s are treated as empty results; we still advance last_synced
-		const expectedYesterday = (() => {
-			const d = new Date(now);
-			d.setDate(d.getDate() - 1);
-			return d.toISOString().slice(0, 10);
-		})();
-		expect(await (last as MockR2Object).text()).toBe(expectedYesterday);
+		// Since the only pending date returned non-OK, last_synced stays unchanged
+		expect(await (last as MockR2Object).text()).toBe(
+			dayBeforeYesterday.toISOString().slice(0, 10),
+		);
 		vi.useRealTimers();
 	});
 
