@@ -86,7 +86,23 @@ async function fetchMovies(date: Date): Promise<Movie[] | null> {
 	} catch {
 		return [];
 	}
-	return z.array(Movie).parse(data);
+
+	// Parse as an array first to ensure the data is an array
+	const arrayResult = z.array(z.unknown()).safeParse(data);
+	if (!arrayResult.success) {
+		return [];
+	}
+
+	// Filter out invalid entries by parsing each element
+	const validMovies: Movie[] = [];
+	for (const item of arrayResult.data) {
+		const result = Movie.safeParse(item);
+		if (result.success) {
+			validMovies.push(result.data);
+		}
+	}
+
+	return validMovies;
 }
 
 function getUrl(date: Date): string {
