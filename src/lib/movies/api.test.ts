@@ -508,7 +508,7 @@ describe("syncMovies", () => {
 		vi.useRealTimers();
 	});
 
-	test("validation failure: rejects and does not update last_synced for that day", async () => {
+	test("filters out invalid movies and continues processing", async () => {
 		vi.useFakeTimers();
 		const now = new Date("2025-01-10T12:00:00.000Z");
 		vi.setSystemTime(now);
@@ -545,6 +545,7 @@ describe("syncMovies", () => {
 				return d.toISOString().slice(0, 10);
 			})();
 			if (dateStr === firstDay) {
+				// Return array with invalid entry - should be filtered out
 				return new Response(JSON.stringify([{ bad: "data" }]), { status: 200 });
 			}
 			const movie = {
@@ -554,12 +555,22 @@ describe("syncMovies", () => {
 			};
 			return new Response(JSON.stringify([movie]), { status: 200 });
 		}) as typeof fetch);
-		await expect(syncMovies(bucket as unknown as R2Bucket)).rejects.toThrow();
 
+		// Should not throw - invalid entries are filtered out
+		await syncMovies(bucket as unknown as R2Bucket);
+
+		// last_synced should progress to yesterday (all days processed)
 		const last = await bucket.get("last_synced.txt");
-		expect(await (last as MockR2Object).text()).toBe(
-			lastSynced.toISOString().slice(0, 10),
-		);
+		const expectedYesterday = (() => {
+			const d = new Date(now);
+			d.setDate(d.getDate() - 1);
+			return d.toISOString().slice(0, 10);
+		})();
+		expect(await (last as MockR2Object).text()).toBe(expectedYesterday);
+
+		// Movies should only contain the valid entry from the second day
+		const movies = await getMovies(bucket as unknown as R2Bucket);
+		expect(movies).toHaveLength(1);
 		vi.useRealTimers();
 	});
 
@@ -716,6 +727,47 @@ describe("syncMovies", () => {
 		const last = await bucket.get("last_synced.txt");
 		const text = await (last as MockR2Object).text();
 		expect(text).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+		vi.useRealTimers();
+	});
+
+	test("filters out empty objects and invalid entries from fetched movies", async () => {
+		vi.useFakeTimers();
+		const now = new Date("2025-01-10T12:00:00.000Z");
+		vi.setSystemTime(now);
+
+		const bucket = new MockR2Bucket();
+		const lastSynced = new Date(now);
+		lastSynced.setDate(lastSynced.getDate() - 2);
+		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
+		await bucket.put("movies.json", "[]");
+
+		// Mock response with empty object and valid movies (like movies-20251012.json)
+		vi.spyOn(globalThis, "fetch").mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => [
+				{
+					title: "Superman",
+					imdb_id: "tt5950044",
+					poster_url: "http://image.tmdb.org/t/p/w500/poster1.jpg",
+				},
+				{}, // Empty object that should be filtered out
+				{
+					title: "Happy Gilmore 2",
+					imdb_id: "tt31868189",
+					poster_url: "http://image.tmdb.org/t/p/w500/poster2.jpg",
+				},
+			],
+		} as unknown as Response);
+
+		await syncMovies(bucket as unknown as R2Bucket);
+
+		const movies = await getMovies(bucket as unknown as R2Bucket);
+		// Should only have 2 movies, the empty object filtered out
+		expect(movies).toHaveLength(2);
+		expect(movies[0]?.title).toBe("Superman");
+		expect(movies[1]?.title).toBe("Happy Gilmore 2");
+
 		vi.useRealTimers();
 	});
 });
