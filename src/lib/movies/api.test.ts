@@ -743,9 +743,9 @@ describe("syncMovies", () => {
 		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
 		await bucket.put("movies.json", "[]");
 
-		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			new Response("Not Found", { status: 404 }),
-		);
+		const fetchSpy = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(new Response("Not Found", { status: 404 }));
 
 		await syncMovies(bucket as unknown as R2Bucket);
 
@@ -773,9 +773,9 @@ describe("syncMovies", () => {
 		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
 		await bucket.put("movies.json", "[]");
 
-		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			new Response("Not Found", { status: 404 }),
-		);
+		const fetchSpy = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(new Response("Not Found", { status: 404 }));
 
 		await syncMovies(bucket as unknown as R2Bucket);
 
