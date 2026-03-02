@@ -20,7 +20,7 @@ jobs:
           node-version-file: ".nvmrc"
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: pnpm lint
