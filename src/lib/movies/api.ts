@@ -77,6 +77,7 @@ async function fetchMovies(date: Date): Promise<Movie[] | null> {
 	const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
 	console.log(`Fetched ${url} (${response.status})`);
 	if (!response.ok) {
+		await response.body?.cancel();
 		return null;
 	}
 
