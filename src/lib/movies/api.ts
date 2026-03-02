@@ -5,6 +5,8 @@ const moviesBucketKey = "movies.json";
 
 const lastSyncedBucketKey = "last_synced.txt";
 
+const stalenessThresholdDays = 28;
+
 export async function syncMovies(bucket: R2Bucket): Promise<void> {
 	const dates = await getNextSyncDates(bucket);
 	if (dates.length === 0) {
@@ -16,7 +18,15 @@ export async function syncMovies(bucket: R2Bucket): Promise<void> {
 	for (const date of dates) {
 		const newMovies = await fetchMovies(date);
 		if (newMovies === null) {
-			continue;
+			const now = new Date();
+			const ageDays = Math.floor(
+				(now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+			);
+			if (ageDays > stalenessThresholdDays) {
+				await setLastSynced(bucket, date);
+				continue;
+			}
+			break;
 		}
 
 		const previousCount = movies.length;

@@ -629,7 +629,7 @@ describe("syncMovies", () => {
 		vi.useRealTimers();
 	});
 
-	test("last_synced progression: mixed OK/non-OK days ends at final attempted date", async () => {
+	test("recent non-OK day breaks loop: last_synced stops before the 404", async () => {
 		vi.useFakeTimers();
 		const now = new Date("2025-01-10T12:00:00.000Z");
 		vi.setSystemTime(now);
@@ -678,12 +678,13 @@ describe("syncMovies", () => {
 		await syncMovies(bucket as unknown as R2Bucket);
 
 		const last = await bucket.get("last_synced.txt");
-		const expectedYesterday3 = (() => {
-			const d = new Date(now);
-			d.setDate(d.getDate() - 1);
+		// Loop breaks at the recent 404 (day 2), so last_synced is only advanced to day 1
+		const expectedLastSynced = (() => {
+			const d = new Date(lastSynced);
+			d.setDate(d.getDate() + 1);
 			return d.toISOString().slice(0, 10);
 		})();
-		expect(await (last as MockR2Object).text()).toBe(expectedYesterday3);
+		expect(await (last as MockR2Object).text()).toBe(expectedLastSynced);
 		vi.useRealTimers();
 	});
 
@@ -727,6 +728,158 @@ describe("syncMovies", () => {
 		const last = await bucket.get("last_synced.txt");
 		const text = await (last as MockR2Object).text();
 		expect(text).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+		vi.useRealTimers();
+	});
+
+	test("stale 404s advance last_synced past dates older than 28 days", async () => {
+		vi.useFakeTimers();
+		const now = new Date("2025-12-01T12:00:00.000Z");
+		vi.setSystemTime(now);
+
+		const bucket = new MockR2Bucket();
+		// last_synced is 60 days ago, so all 14 dates in the window are > 28 days stale
+		const lastSynced = new Date(now);
+		lastSynced.setDate(lastSynced.getDate() - 60);
+		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
+		await bucket.put("movies.json", "[]");
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response("Not Found", { status: 404 }),
+		);
+
+		await syncMovies(bucket as unknown as R2Bucket);
+
+		// All 14 dates are stale 404s, so last_synced advances to lastSynced + 14
+		expect(fetchSpy).toHaveBeenCalledTimes(14);
+		const last = await bucket.get("last_synced.txt");
+		const expectedLastSynced = (() => {
+			const d = new Date(lastSynced);
+			d.setDate(d.getDate() + 14);
+			return d.toISOString().slice(0, 10);
+		})();
+		expect(await (last as MockR2Object).text()).toBe(expectedLastSynced);
+		vi.useRealTimers();
+	});
+
+	test("mix of stale then recent 404s: advances past stale, breaks at recent", async () => {
+		vi.useFakeTimers();
+		const now = new Date("2025-12-01T12:00:00.000Z");
+		vi.setSystemTime(now);
+
+		const bucket = new MockR2Bucket();
+		// last_synced is 31 days ago: first 2 dates are > 28 days stale, rest are <= 28
+		const lastSynced = new Date(now);
+		lastSynced.setDate(lastSynced.getDate() - 31);
+		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
+		await bucket.put("movies.json", "[]");
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response("Not Found", { status: 404 }),
+		);
+
+		await syncMovies(bucket as unknown as R2Bucket);
+
+		// First 2 dates are stale (ages 29, 30), advance past them
+		// Third date is age 27 (<= 28), break
+		expect(fetchSpy).toHaveBeenCalledTimes(3);
+		const last = await bucket.get("last_synced.txt");
+		// last_synced advanced to lastSynced + 2 (the last stale date)
+		const expectedLastSynced = (() => {
+			const d = new Date(lastSynced);
+			d.setDate(d.getDate() + 2);
+			return d.toISOString().slice(0, 10);
+		})();
+		expect(await (last as MockR2Object).text()).toBe(expectedLastSynced);
+		vi.useRealTimers();
+	});
+
+	test("stale 404 followed by OK response: skips stale gap, processes available data", async () => {
+		vi.useFakeTimers();
+		const now = new Date("2025-12-01T12:00:00.000Z");
+		vi.setSystemTime(now);
+
+		const bucket = new MockR2Bucket();
+		// last_synced is 60 days ago, all dates in window are stale
+		const lastSynced = new Date(now);
+		lastSynced.setDate(lastSynced.getDate() - 60);
+		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
+		await bucket.put("movies.json", "[]");
+
+		vi.spyOn(globalThis, "fetch").mockImplementation((async (
+			input: RequestInfo,
+			_init?: RequestInit,
+		) => {
+			const url =
+				typeof input === "string"
+					? input
+					: input instanceof URL
+						? input.toString()
+						: (input as Request).url;
+			const re = /movies-(\d{4})(\d{2})(\d{2})\.json$/;
+			const m = url.match(re);
+			if (!m) throw new Error(`Unexpected URL: ${url}`);
+			const y = m[1];
+			const mo = m[2];
+			const d = m[3];
+			if (y === undefined || mo === undefined || d === undefined) {
+				throw new Error(`Unexpected URL: ${url}`);
+			}
+			const dateStr = `${y}-${mo}-${d}`;
+			// Only the last date in the 14-day window returns OK
+			const lastDay = (() => {
+				const d = new Date(lastSynced);
+				d.setDate(d.getDate() + 14);
+				return d.toISOString().slice(0, 10);
+			})();
+			if (dateStr === lastDay) {
+				const movie = {
+					title: `Title ${dateStr}`,
+					imdb_id: `tt-${dateStr}`,
+					poster_url: `https://img/tt-${dateStr}.jpg`,
+				};
+				return new Response(JSON.stringify([movie]), { status: 200 });
+			}
+			return new Response("Not Found", { status: 404 });
+		}) as typeof fetch);
+
+		await syncMovies(bucket as unknown as R2Bucket);
+
+		// last_synced should advance to the last date (the OK one)
+		const last = await bucket.get("last_synced.txt");
+		const expectedLastSynced = (() => {
+			const d = new Date(lastSynced);
+			d.setDate(d.getDate() + 14);
+			return d.toISOString().slice(0, 10);
+		})();
+		expect(await (last as MockR2Object).text()).toBe(expectedLastSynced);
+
+		// The one OK response should have added a movie
+		const movies = await getMovies(bucket as unknown as R2Bucket);
+		expect(movies).toHaveLength(1);
+		vi.useRealTimers();
+	});
+
+	test("response body is cancelled on non-OK response", async () => {
+		vi.useFakeTimers();
+		const now = new Date("2025-01-10T12:00:00.000Z");
+		vi.setSystemTime(now);
+
+		const bucket = new MockR2Bucket();
+		const lastSynced = new Date(now);
+		lastSynced.setDate(lastSynced.getDate() - 2);
+		await bucket.put("last_synced.txt", lastSynced.toISOString().slice(0, 10));
+		await bucket.put("movies.json", "[]");
+
+		const cancelMock = vi.fn();
+		vi.spyOn(globalThis, "fetch").mockResolvedValue({
+			ok: false,
+			status: 404,
+			body: { cancel: cancelMock },
+		} as unknown as Response);
+
+		await syncMovies(bucket as unknown as R2Bucket);
+
+		expect(cancelMock).toHaveBeenCalledTimes(1);
 		vi.useRealTimers();
 	});
 
